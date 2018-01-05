@@ -1,10 +1,13 @@
 import argparse
 import unicodedata
 import re
+import pprint
 
+from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
 SWGOH_URL = 'https://swgoh.gg/characters/{character}/gear-list/'
+REQUEST_HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
 parser = argparse.ArgumentParser(description='Collect information about gear '
                                              'list for given character of '
@@ -32,7 +35,35 @@ def slugify(value, allow_unicode=False):
 
 def get_character_gear_list(character):
     character_url = SWGOH_URL.format(character=slugify(character))
-    print(character_url)
+    full_gear_list = []
+
+    request = Request(character_url, headers=REQUEST_HEADERS)
+    response = urlopen(request).read().decode('utf-8')
+
+    soup = BeautifulSoup(response, 'html.parser')
+    gear_list = soup.find(attrs={"class": 'media-list-stream'})
+    gears = gear_list.find_all(attrs={"class": 'character'})
+
+    header = soup.title.string
+
+    for gear in gears:
+        try:
+            gear_link = gear.a.get('href')
+            gear_quantity_needed = gear.p.string.strip('x')
+            gear_name = gear.a.get('title')
+
+            full_gear_list.append({
+                'link': gear_link,
+                'quantity_needed': gear_quantity_needed,
+                'name': gear_name
+            })
+        except AttributeError:
+            continue
+
+    print(header)
+    print('=========')
+    pprint.pprint(full_gear_list)
+    print(len(full_gear_list))
 
 
 if __name__ == '__main__':
